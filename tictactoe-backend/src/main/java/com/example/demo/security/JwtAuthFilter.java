@@ -27,47 +27,44 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        System.out.println("🔍 JwtAuthFilter chạy cho request: " + request.getRequestURI());
 
-        String path = request.getRequestURI();
+        // 1. Lấy header Authorization
+        String authHeader = request.getHeader("Authorization");
+        String token = null;
+        String username = null;
 
-        // Cho phép login mà không cần token
-        if (path.contains("/api/login") || path.contains("/swagger-ui") || path.contains("/v3/api-docs")) {
+        // 2. Kiểm tra xem Header có hợp lệ không
+        // LOGIC MỚI: Nếu KHÔNG có token, ta không báo lỗi ngay, mà cho đi tiếp
+        // (chain.doFilter)
+        // Lý do: Nếu đây là trang /login hay /register (được permitAll bên
+        // SecurityConfig), nó sẽ chạy OK.
+        // Nếu đây là trang cần bảo mật, Spring Security sẽ chặn sau đó.
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             chain.doFilter(request, response);
             return;
         }
 
-        String authHeader = request.getHeader("Authorization");
+        // 3. Nếu có token, bắt đầu xử lý
+        token = authHeader.substring(7);
 
-        // Không có header → từ chối
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.getWriter().write("{\"error\":\"Thiếu hoặc sai định dạng Authorization header\"}");
-            return;
+        // Kiểm tra tính hợp lệ của token
+        // Lưu ý: Nếu token sai, lúc này ta mới có thể chặn hoặc bỏ qua.
+        // Ở đây tôi chọn cách an toàn: Nếu token lỗi, cứ cho qua nhưng không set
+        // Authentication -> Spring sẽ chặn sau.
+        if (jwtService.isTokenValid(token)) {
+            username = jwtService.extractUsername(token);
+
+            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                        new User(username, "", Collections.emptyList()), null, Collections.emptyList());
+                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                // Xác thực thành công, lưu vào SecurityContext
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            }
         }
 
-        String token = authHeader.substring(7);
-
-        // Token sai hoặc hết hạn → từ chối
-        if (!jwtService.isTokenValid(token)) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.getWriter().write("{\"error\":\"Token không hợp lệ hoặc đã hết hạn\"}");
-            return;
-        }
-
-        // Token hợp lệ → xác thực user
-        String username = jwtService.extractUsername(token);
-        if (username == null) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.getWriter().write("{\"error\":\"Token không chứa thông tin người dùng hợp lệ\"}");
-            return;
-        }
-
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                new User(username, "", Collections.emptyList()), null, Collections.emptyList());
-        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-
+        // 4. Cho request đi tiếp đến Controller
         chain.doFilter(request, response);
     }
 }
