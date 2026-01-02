@@ -21,6 +21,32 @@ public class GameController {
     @Autowired
     private GameService gameService;
 
+    @Autowired
+    private com.example.demo.repository.room.RoomRepository roomRepository;
+
+    // Client yêu cầu lấy trạng thái phòng hiện tại khi vừa connect socket xong
+    @MessageMapping("/join")
+    public void joinRoom(@Payload Map<String, String> payload) {
+        String roomId = payload.get("roomId");
+
+        // Thử lấy game từ RAM
+        GameMatch match = gameService.createOrGetGame(roomId, null);
+
+        // Nếu P1 vẫn null (do game mới được tạo trong RAM nhưng chưa có data từ DB)
+        if (match != null && match.getPlayer1() == null) {
+            // Thử cứu vãn bằng cách lấy từ DB
+            roomRepository.findByRoomCode(roomId).ifPresent(room -> {
+                match.setPlayer1(room.getPlayer1());
+                match.setPlayer2(room.getPlayer2());
+                match.setCurrentTurn(room.getPlayer1());
+            });
+        }
+
+        if (match != null && match.getPlayer1() != null) {
+            messagingTemplate.convertAndSend("/topic/room/" + roomId, match);
+        }
+    }
+
     // Client sẽ gửi đến: /app/move
     @MessageMapping("/move")
     public void processMove(@Payload MoveMessage move) {

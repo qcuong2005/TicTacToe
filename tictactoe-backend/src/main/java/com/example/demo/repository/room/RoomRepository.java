@@ -21,4 +21,7 @@ public interface RoomRepository extends JpaRepository<RoomEntity, Long> {
     // Logic: Chỉ tìm những phòng chưa đầy (status khác 'full')
     @Query("SELECT r FROM RoomEntity r WHERE (r.roomCode = :input OR r.roomName = :input) AND r.status <> 'full'")
     Optional<RoomEntity> findRoomToJoin(String input);
+
+    // 4. Tìm tất cả phòng đang đợi
+    java.util.List<RoomEntity> findByStatus(String status);
 }
