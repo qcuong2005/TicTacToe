@@ -57,6 +57,9 @@ public class RoomController {
 
         roomRepository.save(room);
 
+        // --- KHỞI TẠO GAME TRONG RAM NGAY KHI TẠO PHÒNG ---
+        gameService.createOrGetGame(room.getRoomCode(), room.getPlayer1());
+
         // --- QUAN TRỌNG: PHẢI TRẢ VỀ DỮ LIỆU ĐẦY ĐỦ ---
         return ResponseEntity.ok(Map.of(
                 "message", "Tạo phòng thành công!",
@@ -120,4 +123,11 @@ public class RoomController {
     }
 
     // ... (Giữ nguyên getAllRooms) ...
+
+    // ✅ API MỚI: Lấy danh sách phòng đang chờ
+    @org.springframework.web.bind.annotation.GetMapping("/waiting")
+    public ResponseEntity<?> getWaitingRooms() {
+        java.util.List<RoomEntity> waitingRooms = roomRepository.findByStatus("waiting");
+        return ResponseEntity.ok(waitingRooms);
+    }
 }
