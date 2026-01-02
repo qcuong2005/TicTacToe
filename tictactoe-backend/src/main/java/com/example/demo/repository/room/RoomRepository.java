@@ -11,11 +11,14 @@ import com.example.demo.model.room.RoomEntity;
 @Repository
 public interface RoomRepository extends JpaRepository<RoomEntity, Long> {
 
-    // Kiểm tra xem mã code đã tồn tại chưa (để tránh trùng)
+    // 1. Kiểm tra xem mã code đã tồn tại chưa (để tránh trùng khi tạo random)
     boolean existsByRoomCode(String roomCode);
 
-    // Tìm phòng theo mã Code HOẶC tên phòng
-    // Lưu ý: Chỉ tìm phòng đang chờ (waiting) để vào
-    @Query("SELECT r FROM RoomEntity r WHERE (r.roomCode = :input OR r.roomName = :input) AND r.status = 'waiting'")
+    // 2. Tìm phòng chính xác theo mã (Dùng để lấy tên phòng lưu vào lịch sử)
+    Optional<RoomEntity> findByRoomCode(String roomCode);
+
+    // 3. Tìm phòng để tham gia (Tìm theo Tên hoặc Mã)
+    // Logic: Chỉ tìm những phòng chưa đầy (status khác 'full')
+    @Query("SELECT r FROM RoomEntity r WHERE (r.roomCode = :input OR r.roomName = :input) AND r.status <> 'full'")
     Optional<RoomEntity> findRoomToJoin(String input);
 }
