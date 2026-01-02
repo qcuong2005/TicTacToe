@@ -1,70 +1,82 @@
-# Getting Started with Create React App
+# 🎮 Caro Online - Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Giao diện người dùng cho game Caro (Gomoku) đa người chơi thời gian thực.
 
-## Available Scripts
+## ✨ Tính năng
 
-In the project directory, you can run:
+- 🔐 **Đăng ký / Đăng nhập** với JWT Authentication
+- 🏠 **Lobby** - Tạo phòng, vào phòng bằng mã, xem danh sách phòng đang chờ
+- 🎯 **Chơi game Caro 5x5** với luật thắng 3-4 ô liên tiếp
+- ⚡ **Real-time** với WebSocket (STOMP)
+- 📊 **Lịch sử đấu** - Xem lại các trận đã chơi
+- 🎨 **Giao diện Premium** - Dark Neon Theme với hiệu ứng Glassmorphism
 
-### `npm start`
+## 🛠️ Công nghệ
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- **React 18** - UI Framework
+- **React Router v6** - Điều hướng SPA
+- **Axios** - HTTP Client
+- **STOMP.js** - WebSocket Client
+- **CSS3** - Animations & Glassmorphism
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## 📁 Cấu trúc thư mục
 
-### `npm test`
+```
+src/
+├── pages/           # Các trang chính
+│   ├── Auth.js      # Đăng nhập / Đăng ký
+│   ├── Lobby.js     # Sảnh chờ
+│   ├── GameRoom.js  # Phòng chơi game
+│   └── History.js   # Lịch sử đấu
+├── services/        # API & WebSocket
+│   ├── api.js       # Axios instance + interceptors
+│   └── socket.js    # STOMP WebSocket service
+├── styles/
+│   └── global.css   # Design system & global styles
+└── App.js           # Router configuration
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## 🚀 Cài đặt & Chạy
 
-### `npm run build`
+### Yêu cầu
+- Node.js 18+
+- Backend đang chạy ở `http://localhost:8080`
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Cài đặt dependencies
+```bash
+npm install
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Chạy development server
+```bash
+npm start
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Mở [http://localhost:3000](http://localhost:3000) để xem trong trình duyệt.
 
-### `npm run eject`
+### Build production
+```bash
+npm run build
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## 🔗 Kết nối Backend
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+Frontend mặc định kết nối tới:
+- **REST API**: `http://localhost:8080/api`
+- **WebSocket**: `ws://localhost:8080/ws`
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+Để thay đổi, sửa file `src/services/api.js` và `src/services/socket.js`.
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## 🎨 Design System
 
-## Learn More
+| Màu | Mã |
+|-----|-----|
+| Neon Pink | `#ff2d75` |
+| Neon Blue | `#00d4ff` |
+| Neon Purple | `#a855f7` |
+| Gold | `#ffd700` |
+| Background | `#0a0a1a` |
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## 📝 License
 
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+MIT License
