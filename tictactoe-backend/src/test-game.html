@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Game Cờ Caro 5x5 Realtime</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: 450px; text-align: center; }
+        h2 { margin-top: 0; color: #333; }
+        input, button { padding: 10px; margin: 5px 0; width: 90%; border-radius: 5px; border: 1px solid #ddd; }
+        
+        button { background-color: #007bff; color: white; cursor: pointer; border: none; font-weight: bold; transition: 0.2s; }
+        button:hover { background-color: #0056b3; }
+        
+        button.secondary { background-color: #6c757d; }
+        button.secondary:hover { background-color: #545b62; }
+        
+        button.restart { background-color: #28a745; display: none; }
+        button.history-btn { background-color: #17a2b8; }
+
+        .screen { display: none; }
+        .active { display: block; }
+
+        /* Bàn cờ */
+        #game-board { 
+            display: grid; 
+            grid-template-columns: repeat(5, 60px); 
+            grid-template-rows: repeat(5, 60px); 
+            gap: 5px; margin: 20px auto; width: fit-content;
+        }
+        .cell { 
+            width: 60px; height: 60px; background: #eee; 
+            display: flex; justify-content: center; align-items: center; 
+            font-size: 24px; font-weight: bold; cursor: pointer; border-radius: 5px;
+        }
+        .cell:hover { background: #ddd; }
+        .cell.x { color: red; }
+        .cell.o { color: blue; }
+
+        #status-msg { margin-top: 10px; font-weight: bold; min-height: 40px; }
+        #room-info { background: #e9ecef; padding: 5px; border-radius: 5px; margin-bottom: 10px; font-size: 14px; }
+
+        /* CSS cho Lịch sử */
+        #history-list {
+            text-align: left;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            padding: 10px;
+            margin-bottom: 15px;
+            background: #fafafa;
+        }
+        .history-group { margin-bottom: 15px; border-bottom: 2px dashed #ccc; padding-bottom: 10px; }
+        .history-group h3 { margin: 0 0 5px 0; color: #007bff; font-size: 16px; }
+        .match-item { font-size: 13px; padding: 5px; background: white; margin-bottom: 5px; border-radius: 4px; border: 1px solid #ddd; }
+        .winner-text { color: green; font-weight: bold; }
+        .draw-text { color: purple; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <div id="screen-login" class="screen active">
+        <h2>Đăng Nhập</h2>
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="handleLogin()">Đăng Nhập</button>
+    </div>
+
+    <div id="screen-lobby" class="screen">
+        <h2>Sảnh Chờ</h2>
+        <p>Chào, <b id="display-user"></b></p>
+        <hr>
+        <input type="text" id="newRoomName" placeholder="Tên phòng (VD: Phòng VIP)">
+        <button onclick="createRoom()">➕ Tạo Phòng Mới</button>
+        <hr>
+        <input type="text" id="joinRoomId" placeholder="Nhập Mã Phòng hoặc Tên Phòng">
+        <button class="secondary" onclick="joinRoom()">▶️ Vào Phòng</button>
+        <hr>
+        <button class="history-btn" onclick="fetchHistory()">📜 Xem Lịch Sử Đấu</button>
+    </div>
+
+    <div id="screen-history" class="screen">
+        <h2>Lịch Sử Các Phòng</h2>
+        <div id="history-list">
+            <p>Đang tải dữ liệu...</p>
+        </div>
+        <button class="secondary" onclick="showScreen('screen-lobby')">🔙 Quay lại Sảnh</button>
+    </div>
+
+    <div id="screen-game" class="screen">
+        <h2 id="room-title">Game</h2>
+        <div id="room-info">
+            Mã: <b id="current-room-id" style="color: red; font-size: 18px;">...</b> | Bạn: <b id="my-role">...</b>
+        </div>
+
+        <div id="game-board"></div>
+
+        <div id="status-msg">Đang kết nối...</div>
+
+        <button id="btn-restart" class="restart" onclick="sendRestart()">🔄 CHƠI VÁN MỚI</button>
+        
+        <button class="secondary" onclick="location.reload()" style="margin-top: 10px;">Thoát Phòng</button>
+    </div>
+
+</div>
+
+<script>
+    const API_URL = 'http://localhost:8080/api';
+    const WS_URL = 'http://localhost:8080/ws';
+    
+    let jwtToken = null;
+    let currentUser = null;
+    let currentRoomId = null;
+    let stompClient = null;
+
+    // --- 1. LOGIN ---
+    async function handleLogin() {
+        const u = document.getElementById("username").value;
+        const p = document.getElementById("password").value;
+        try {
+            const res = await fetch(`${API_URL}/login`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: u, password: p })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                jwtToken = data.token;
+                currentUser = data.username;
+                document.getElementById('display-user').innerText = currentUser;
+                showScreen('screen-lobby');
+            } else alert("Sai tài khoản/mật khẩu");
+        } catch (e) { alert("Lỗi Server: " + e); }
+    }
+
+    // --- 2. XEM LỊCH SỬ (TÍNH NĂNG MỚI) ---
+    async function fetchHistory() {
+        showScreen('screen-history');
+        const listDiv = document.getElementById('history-list');
+        listDiv.innerHTML = "Đang tải...";
+
+        try {
+            // Gọi API lấy lịch sử đã gom nhóm
+            const res = await fetch(`${API_URL}/history/all-grouped`, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${jwtToken}` }
+            });
+
+            if (res.ok) {
+                const data = await res.json(); // Map<String, List<MatchHistory>>
+                
+                if (Object.keys(data).length === 0) {
+                    listDiv.innerHTML = "<p>Chưa có lịch sử đấu nào.</p>";
+                    return;
+                }
+
+                let html = "";
+                // Duyệt qua từng phòng
+                for (const [roomCode, matches] of Object.entries(data)) {
+                    // Lấy tên phòng từ trận đấu đầu tiên (nếu có)
+                    const roomName = matches.length > 0 ? matches[0].roomName : "Không tên";
+                    
+                    html += `<div class="history-group">
+                                <h3>🏠 Phòng: ${roomName} (Code: ${roomCode})</h3>`;
+                    
+                    matches.forEach(m => {
+                        const result = m.winner === "DRAW" 
+                            ? `<span class="draw-text">HÒA</span>` 
+                            : `Thắng: <span class="winner-text">${m.winner}</span>`;
+                        
+                        const time = new Date(m.playedAt).toLocaleString();
+
+                        html += `<div class="match-item">
+                                    ⚔️ <b>${m.player1}</b> vs <b>${m.player2}</b><br>
+                                    Kết quả: ${result}<br>
+                                    <small style="color:#888">${time}</small>
+                                 </div>`;
+                    });
+                    html += `</div>`;
+                }
+                listDiv.innerHTML = html;
+            } else {
+                listDiv.innerHTML = "Lỗi tải lịch sử.";
+            }
+        } catch (e) {
+            console.error(e);
+            listDiv.innerHTML = "Không thể kết nối Server.";
+        }
+    }
+
+    // --- 3. CREATE ROOM ---
+    async function createRoom() {
+        const name = document.getElementById("newRoomName").value;
+        try {
+            const res = await fetch(`${API_URL}/rooms/create`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwtToken}` },
+                body: JSON.stringify({ roomName: name })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                enterGame(data.roomCode, data.roomName);
+            } else alert("Lỗi tạo phòng");
+        } catch (e) { console.error(e); }
+    }
+
+    // --- 4. JOIN ROOM ---
+    async function joinRoom() {
+        const id = document.getElementById("joinRoomId").value;
+        try {
+            const res = await fetch(`${API_URL}/rooms/join`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwtToken}` },
+                body: JSON.stringify({ identifier: id })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                enterGame(data.roomCode, data.roomName);
+            } else alert("Phòng đầy hoặc không tồn tại");
+        } catch (e) { console.error(e); }
+    }
+
+    // --- 5. GAME LOGIC ---
+    function enterGame(roomId, roomName) {
+        if (!roomId || !roomName) { alert("Lỗi dữ liệu phòng!"); return; }
+
+        currentRoomId = roomId;
+        document.getElementById('room-title').innerText = roomName;
+        document.getElementById('current-room-id').innerText = roomId;
+        document.getElementById('my-role').innerText = currentUser;
+        
+        showScreen('screen-game');
+        renderBoard(null);
+        connectWebSocket();
+    }
+
+    function connectWebSocket() {
+        const socket = new SockJS(WS_URL);
+        stompClient = Stomp.over(socket);
+        stompClient.debug = null; 
+
+        stompClient.connect({}, function () {
+            console.log('Socket Connected');
+            stompClient.subscribe('/topic/room/' + currentRoomId, function (msg) {
+                updateGameState(JSON.parse(msg.body));
+            });
+        }, function(err) {
+            document.getElementById('status-msg').innerText = "Mất kết nối!";
+        });
+    }
+
+    function updateGameState(match) {
+        renderBoard(match.board);
+        const statusDiv = document.getElementById('status-msg');
+        const btnRestart = document.getElementById('btn-restart');
+
+        // TRƯỜNG HỢP HÒA
+        if (match.winner === "DRAW") {
+            statusDiv.innerHTML = `⚖️ <b>HÒA RỒI! BẤT PHÂN THẮNG BẠI</b> ⚖️`;
+            statusDiv.style.color = "purple";
+            btnRestart.style.display = "inline-block"; 
+        } 
+        // TRƯỜNG HỢP CÓ NGƯỜI THẮNG
+        else if (match.winner) {
+            statusDiv.innerHTML = `🏆 <b>${match.winner} CHIẾN THẮNG!</b> 🏆`;
+            statusDiv.style.color = "green";
+            btnRestart.style.display = "inline-block";
+        } 
+        // TRƯỜNG HỢP ĐỢI NGƯỜI
+        else if (!match.player2) {
+            statusDiv.innerText = "⏳ Đang chờ người thứ 2...";
+            statusDiv.style.color = "orange";
+            btnRestart.style.display = "none";
+        } 
+        // TRƯỜNG HỢP ĐANG CHƠI
+        else {
+            btnRestart.style.display = "none";
+            const isMyTurn = match.currentTurn === currentUser;
+            statusDiv.innerHTML = `⚔️ ${match.player1} vs ${match.player2}<br>👉 Lượt đi: <b>${match.currentTurn}</b>`;
+            statusDiv.style.color = isMyTurn ? "blue" : "black";
+        }
+    }
+
+    function sendRestart() {
+        if (stompClient) {
+            stompClient.send("/app/restart", {}, JSON.stringify({ roomId: currentRoomId }));
+            document.getElementById('btn-restart').style.display = 'none';
+        }
+    }
+
+    function renderBoard(board) {
+        const div = document.getElementById("game-board");
+        div.innerHTML = "";
+        for (let x = 0; x < 5; x++) {
+            for (let y = 0; y < 5; y++) {
+                const cell = document.createElement("div");
+                cell.className = "cell";
+                if (board) {
+                    if (board[x][y] === 1) { cell.classList.add("x"); cell.innerText = "X"; }
+                    if (board[x][y] === 2) { cell.classList.add("o"); cell.innerText = "O"; }
+                }
+                cell.onclick = () => {
+                    if(stompClient) stompClient.send("/app/move", {}, JSON.stringify({ roomId: currentRoomId, player: currentUser, x: x, y: y }));
+                };
+                div.appendChild(cell);
+            }
+        }
+    }
+
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    }
+</script>
+
+</body>
+</html>
