@@ -143,10 +143,15 @@ const GameRoom = () => {
                             if (cell === 1) cellContent = 'X';
                             if (cell === 2) cellContent = 'O';
 
+                            // Check if this cell is a winning cell
+                            const isWinningCell = gameState.winningCells?.some(
+                                ([wr, wc]) => wr === r && wc === c
+                            );
+
                             return (
                                 <div
                                     key={c}
-                                    className={`cell ${cellContent} ${!cell && isMyTurn && !gameState.winner ? 'clickable' : ''}`}
+                                    className={`cell ${cellContent} ${!cell && isMyTurn && !gameState.winner ? 'clickable' : ''} ${isWinningCell ? 'winning' : ''}`}
                                     onClick={() => handleCellClick(r, c)}
                                 >
                                     {cellContent}
