@@ -1,18 +1,21 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import socketService from '../services/socket';
 import './GameRoom.css'; // Will create this for specific board styles
 
 const GameRoom = () => {
     const { roomId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const currentUser = localStorage.getItem('username');
+    const isBotMode = location.state?.botMode || false;
 
     const [gameState, setGameState] = useState(null);
     const [status, setStatus] = useState('Đang kết nối...');
 
     // Use ref to prevent double connection in React Strict Mode which might be enabled
     const connectedRef = useRef(false);
+    const subscriptionRef = useRef(null);
 
     useEffect(() => {
         if (connectedRef.current) return;
@@ -21,11 +24,8 @@ const GameRoom = () => {
             setStatus('Đã kết nối! Đang đợi dữ liệu...');
             connectedRef.current = true;
 
-            // Send join message to get initial state
-            socketService.sendJoin(roomId);
-
-            // Subscribe to room updates
-            socketService.subscribeToRoom(roomId, (matchData) => {
+            // 1. Subscribe FIRST to avoid missing messages
+            subscriptionRef.current = socketService.subscribeToRoom(roomId, (matchData) => {
                 console.log('Received match data:', matchData);
                 setGameState(matchData);
 
@@ -38,14 +38,8 @@ const GameRoom = () => {
                 }
             });
 
-            // Trigger restart to get initial state if needed, or just wait for join event
-            // But since we navigate here AFTER join API, user join event might trigger update
-            // Ideally backend sends initial state upon subscription or we ask for it.
-            // For now, let's assume the Join API triggered a push, or we need to trigger "I am here"
-            // Actually, the previous 'join' API call already broadcasted. 
-            // BUT if I reload page, I might miss it.
-            // Let's rely on real-time moves for now. 
-            // A "reconnect" feature would be good but keeping it simple.
+            // 2. Then Send join message to trigger the backend to send initial state
+            socketService.sendJoin(roomId);
         };
 
         const onError = (err) => {
@@ -56,6 +50,10 @@ const GameRoom = () => {
         socketService.connect(onConnected, onError);
 
         return () => {
+            if (subscriptionRef.current) {
+                subscriptionRef.current.unsubscribe();
+                subscriptionRef.current = null;
+            }
             socketService.disconnect();
             connectedRef.current = false;
         };
@@ -84,28 +82,34 @@ const GameRoom = () => {
     };
 
     if (!gameState) {
+
         return (
             <div className="glass-container" style={{ maxWidth: '400px' }}>
                 <h2 style={{ marginBottom: '1rem' }}>{status}</h2>
-                <div style={{
-                    background: 'var(--glass-bg)',
-                    border: '1px dashed var(--accent-neon-blue)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '1.5rem',
-                    marginBottom: '1.5rem'
-                }}>
-                    <p style={{ color: 'var(--text-muted)', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Mã phòng của bạn:</p>
-                    <p style={{
-                        color: 'var(--accent-neon-blue)',
-                        fontSize: '2rem',
-                        fontWeight: 700,
-                        letterSpacing: '4px',
-                        margin: 0
-                    }}>{roomId}</p>
-                </div>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-                    📤 Chia sẻ mã này cho bạn bè để cùng chơi!
-                </p>
+                {/* Only show Room Code if NOT in Bot Mode */}
+                {!isBotMode && (
+                    <>
+                        <div style={{
+                            background: 'var(--glass-bg)',
+                            border: '1px dashed var(--accent-neon-blue)',
+                            borderRadius: 'var(--radius-md)',
+                            padding: '1.5rem',
+                            marginBottom: '1.5rem'
+                        }}>
+                            <p style={{ color: 'var(--text-muted)', marginBottom: '0.5rem', fontSize: '0.9rem' }}>Mã phòng của bạn:</p>
+                            <p style={{
+                                color: 'var(--accent-neon-blue)',
+                                fontSize: '2rem',
+                                fontWeight: 700,
+                                letterSpacing: '4px',
+                                margin: 0
+                            }}>{roomId}</p>
+                        </div>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+                            📤 Chia sẻ mã này cho bạn bè để cùng chơi!
+                        </p>
+                    </>
+                )}
                 <button onClick={handleBack} className="glass-button secondary">← Quay lại Lobby</button>
             </div>
         );
