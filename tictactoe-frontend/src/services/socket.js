@@ -13,7 +13,7 @@ class SocketService {
         }
 
         this.client = new Client({
-            brokerURL: 'ws://localhost:8080/ws', // WebSocket endpoint
+            brokerURL: 'ws://localhost:8080/ws/websocket', // WebSocket endpoint
             reconnectDelay: 5000,
             onConnect: () => {
                 this.connected = true;

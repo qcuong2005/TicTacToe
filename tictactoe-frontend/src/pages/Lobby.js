@@ -34,6 +34,16 @@ const Lobby = () => {
         }
     };
 
+    const handleCreateBotRoom = async () => {
+        try {
+            const response = await api.post('/rooms/create-bot');
+            navigate(`/game/${response.data.roomCode}`, { state: { botMode: true } });
+        } catch (err) {
+            console.error(err);
+            setError('Không thể tạo phòng đấu với Bot');
+        }
+    };
+
     const handleJoinRoom = async (code) => {
         const identifier = code || joinCode;
         if (!identifier) {
@@ -94,6 +104,14 @@ const Lobby = () => {
                 />
                 <button onClick={handleCreateRoom} className="glass-button">
                     ✨ Tạo Phòng
+                </button>
+                <div style={{ marginTop: '0.75rem' }}></div>
+                <button
+                    onClick={handleCreateBotRoom}
+                    className="glass-button secondary"
+                    style={{ background: 'rgba(20, 255, 236, 0.15)', borderColor: 'var(--accent-neon-blue)' }}
+                >
+                    🤖 Đấu với Bot
                 </button>
             </div>
 
