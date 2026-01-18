@@ -69,6 +69,35 @@ public class RoomController {
                 "status", room.getStatus()));
     }
 
+    // API: Tạo phòng chơi với BOT
+    @PostMapping("/create-bot")
+    public ResponseEntity<?> createBotRoom() {
+String currentUser = SecurityContextHolder.getContext().getAuthentication().getName();
+
+        RoomEntity room = new RoomEntity();
+        room.setRoomName("PvE: " + currentUser + " vs BOT");
+        room.setPlayer1(currentUser);
+        room.setPlayer2("BOT"); // Đánh dấu đối thủ là BOT
+        room.setStatus("full"); // Phòng đầy luôn, vào chơi ngay
+
+        // Sinh mã phòng random
+        String code = String.valueOf(System.currentTimeMillis() % 10000);
+        room.setRoomCode(code);
+
+        roomRepository.save(room);
+
+        // Khởi tạo game trong RAM luôn
+        GameMatch match = gameService.createOrGetGame(code, currentUser);
+        match.setPlayer2("BOT");
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Bắt đầu chơi với máy!",
+                "roomCode", room.getRoomCode(),
+                "roomName", room.getRoomName(),
+                "player1", room.getPlayer1(),
+                "player2", "BOT"));
+    }
+
     // ✅ SỬA HÀM JOIN ROOM: Thêm đoạn bắn thông báo Socket
     @PostMapping("/join")
     public ResponseEntity<?> joinRoom(@RequestBody JoinRoomRequest req) {
@@ -113,18 +142,13 @@ public class RoomController {
         messagingTemplate.convertAndSend("/topic/room/" + room.getRoomCode(), match);
 
         // ----------------------------------------------------
-
-        return ResponseEntity.ok(Map.of(
+return ResponseEntity.ok(Map.of(
                 "message", "Tham gia thành công!",
                 "roomCode", room.getRoomCode(),
                 "roomName", room.getRoomName(),
                 "player1", room.getPlayer1(),
                 "player2", (room.getPlayer2() == null ? "" : room.getPlayer2())));
     }
-
-    // ... (Giữ nguyên getAllRooms) ...
-
-    // ✅ API MỚI: Lấy danh sách phòng đang chờ
     @org.springframework.web.bind.annotation.GetMapping("/waiting")
     public ResponseEntity<?> getWaitingRooms() {
         java.util.List<RoomEntity> waitingRooms = roomRepository.findByStatus("waiting");
