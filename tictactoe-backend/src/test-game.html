@@ -17,6 +17,10 @@
         button.secondary { background-color: #6c757d; }
         button.secondary:hover { background-color: #545b62; }
         
+        /* Style cho nút Bot màu tím */
+        button.bot-btn { background-color: #6f42c1; }
+        button.bot-btn:hover { background-color: #59359a; }
+
         button.restart { background-color: #28a745; display: none; }
         button.history-btn { background-color: #17a2b8; }
 
@@ -55,7 +59,7 @@
         .history-group { margin-bottom: 15px; border-bottom: 2px dashed #ccc; padding-bottom: 10px; }
         .history-group h3 { margin: 0 0 5px 0; color: #007bff; font-size: 16px; }
         .match-item { font-size: 13px; padding: 5px; background: white; margin-bottom: 5px; border-radius: 4px; border: 1px solid #ddd; }
-        .winner-text { color: green; font-weight: bold; }
+.winner-text { color: green; font-weight: bold; }
         .draw-text { color: purple; font-weight: bold; }
     </style>
 </head>
@@ -75,7 +79,8 @@
         <p>Chào, <b id="display-user"></b></p>
         <hr>
         <input type="text" id="newRoomName" placeholder="Tên phòng (VD: Phòng VIP)">
-        <button onclick="createRoom()">➕ Tạo Phòng Mới</button>
+        <button onclick="createRoom()">➕ Tạo Phòng Mới (PvP)</button>
+        <button class="bot-btn" onclick="playWithBot()">🤖 Chơi Với Máy (PvE)</button>
         <hr>
         <input type="text" id="joinRoomId" placeholder="Nhập Mã Phòng hoặc Tên Phòng">
         <button class="secondary" onclick="joinRoom()">▶️ Vào Phòng</button>
@@ -133,24 +138,23 @@
                 document.getElementById('display-user').innerText = currentUser;
                 showScreen('screen-lobby');
             } else alert("Sai tài khoản/mật khẩu");
-        } catch (e) { alert("Lỗi Server: " + e); }
+} catch (e) { alert("Lỗi Server: " + e); }
     }
 
-    // --- 2. XEM LỊCH SỬ (TÍNH NĂNG MỚI) ---
+    // --- 2. XEM LỊCH SỬ ---
     async function fetchHistory() {
         showScreen('screen-history');
         const listDiv = document.getElementById('history-list');
         listDiv.innerHTML = "Đang tải...";
 
         try {
-            // Gọi API lấy lịch sử đã gom nhóm
             const res = await fetch(`${API_URL}/history/all-grouped`, {
                 method: 'GET',
                 headers: { 'Authorization': `Bearer ${jwtToken}` }
             });
 
             if (res.ok) {
-                const data = await res.json(); // Map<String, List<MatchHistory>>
+                const data = await res.json();
                 
                 if (Object.keys(data).length === 0) {
                     listDiv.innerHTML = "<p>Chưa có lịch sử đấu nào.</p>";
@@ -158,9 +162,7 @@
                 }
 
                 let html = "";
-                // Duyệt qua từng phòng
                 for (const [roomCode, matches] of Object.entries(data)) {
-                    // Lấy tên phòng từ trận đấu đầu tiên (nếu có)
                     const roomName = matches.length > 0 ? matches[0].roomName : "Không tên";
                     
                     html += `<div class="history-group">
@@ -170,7 +172,6 @@
                         const result = m.winner === "DRAW" 
                             ? `<span class="draw-text">HÒA</span>` 
                             : `Thắng: <span class="winner-text">${m.winner}</span>`;
-                        
                         const time = new Date(m.playedAt).toLocaleString();
 
                         html += `<div class="match-item">
@@ -191,7 +192,7 @@
         }
     }
 
-    // --- 3. CREATE ROOM ---
+    // --- 3. CREATE ROOM (PVP) ---
     async function createRoom() {
         const name = document.getElementById("newRoomName").value;
         try {
@@ -205,6 +206,29 @@
                 enterGame(data.roomCode, data.roomName);
             } else alert("Lỗi tạo phòng");
         } catch (e) { console.error(e); }
+    }
+
+    // --- ✅ 3.5. PLAY WITH BOT (PVE - TÍNH NĂNG MỚI) ---
+    async function playWithBot() {
+        try {
+const res = await fetch(`${API_URL}/rooms/create-bot`, {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${jwtToken}` 
+                }
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                // Vào game ngay lập tức với thông tin Server trả về (Player2 = "BOT")
+                enterGame(data.roomCode, data.roomName);
+            } else {
+                alert("Lỗi khi tạo phòng chơi với Bot!");
+            }
+        } catch (e) { 
+            console.error(e);
+            alert("Lỗi kết nối Server: " + e);
+        }
     }
 
     // --- 4. JOIN ROOM ---
@@ -265,11 +289,11 @@
         } 
         // TRƯỜNG HỢP CÓ NGƯỜI THẮNG
         else if (match.winner) {
-            statusDiv.innerHTML = `🏆 <b>${match.winner} CHIẾN THẮNG!</b> 🏆`;
+statusDiv.innerHTML = `🏆 <b>${match.winner} CHIẾN THẮNG!</b> 🏆`;
             statusDiv.style.color = "green";
             btnRestart.style.display = "inline-block";
         } 
-        // TRƯỜNG HỢP ĐỢI NGƯỜI
+        // TRƯỜNG HỢP ĐỢI NGƯỜI (Chỉ xảy ra ở chế độ PvP)
         else if (!match.player2) {
             statusDiv.innerText = "⏳ Đang chờ người thứ 2...";
             statusDiv.style.color = "orange";
